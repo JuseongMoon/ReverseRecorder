@@ -74,9 +74,6 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 isTransitioning = false
                 transitionRadius = 0
-
-                // 오버레이 제거 후 앱 아이콘 변경 (iOS 18 크래시 방지)
-                AppIconManager.shared.setIcon(isDarkMode: newDarkMode, completion: nil)
             }
         }
     }
@@ -233,7 +230,7 @@ struct ContentView: View {
                         .mask(
                             Circle()
                                 .frame(width: transitionRadius * 2, height: transitionRadius * 2)
-                                .position(x: toggleButtonCenter.x, y: toggleButtonCenter.y - 15)
+                                .position(x: toggleButtonCenter.x, y: toggleButtonCenter.y - 9)
                                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
                         )
                         .allowsHitTesting(false)
@@ -248,7 +245,6 @@ struct ContentView: View {
         .toast(isShowing: $viewModel.showToast, message: viewModel.toastMessage ?? "")
         .onAppear {
             viewModel.requestMicrophonePermission()
-            AppIconManager.shared.setIcon(isDarkMode: isDarkMode)
 
             // 스냅샷 미리 캡처 (디폴트 UI 상태)
             prepareThemeSnapshots()
