@@ -56,7 +56,7 @@ struct DarkModeToggle: View {
                     )
             }
         )
-        .animation(.spring(response: 0.3), value: isDarkMode)
+        .animation(isTransitioning ? nil : .spring(response: 0.3), value: isDarkMode)
     }
 }
 

@@ -69,11 +69,15 @@ struct ContentView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             isDarkModeOverride = newDarkMode
-            isTransitioning = false
-            transitionRadius = 0
 
-            // 트랜지션 완료 후 앱 아이콘 변경 (iOS 18 크래시 방지)
-            AppIconManager.shared.setIcon(isDarkMode: newDarkMode, completion: nil)
+            // 테마 변경이 먼저 반영된 후 오버레이 제거 (깜빡임 방지)
+            DispatchQueue.main.async {
+                isTransitioning = false
+                transitionRadius = 0
+
+                // 오버레이 제거 후 앱 아이콘 변경 (iOS 18 크래시 방지)
+                AppIconManager.shared.setIcon(isDarkMode: newDarkMode, completion: nil)
+            }
         }
     }
 
