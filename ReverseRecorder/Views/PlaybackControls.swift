@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PlaybackControls: View {
     @ObservedObject var viewModel: RecorderViewModel
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         HStack(spacing: 40) {
@@ -52,7 +53,7 @@ struct PlaybackControls: View {
 
             // Delete button
             Button(action: {
-                viewModel.deleteRecording()
+                showDeleteConfirmation = true
             }) {
                 Image(systemName: "trash.circle.fill")
                     .font(.system(size: 50))
@@ -68,6 +69,14 @@ struct PlaybackControls: View {
             .disabled(viewModel.currentRecording == nil)
         }
         .opacity(viewModel.currentRecording == nil ? 0.3 : 1.0)
+        .alert("녹음 삭제", isPresented: $showDeleteConfirmation) {
+            Button("취소", role: .cancel) { }
+            Button("삭제", role: .destructive) {
+                viewModel.deleteRecording()
+            }
+        } message: {
+            Text("이 녹음을 삭제하시겠습니까?")
+        }
     }
 }
 

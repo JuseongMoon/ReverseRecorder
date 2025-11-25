@@ -42,9 +42,9 @@ struct ContentView: View {
             VStack {
                 Spacer()
 
-                // Progress slider
+                // Progress slider with waveform
                 ProgressSlider(viewModel: viewModel)
-                    .frame(height: 60)
+                    .frame(height: 90)
                     .padding(.horizontal)
                     .padding(.bottom, 20)
 
@@ -53,7 +53,7 @@ struct ContentView: View {
                     .padding(.bottom, 50)
             }
 
-            // Dark mode toggle (top left)
+            // Top controls (dark mode toggle & share button)
             VStack {
                 HStack {
                     DarkModeToggle(isDarkMode: isDarkModeBinding)
@@ -61,6 +61,10 @@ struct ContentView: View {
                         .padding(.top, 20)
 
                     Spacer()
+
+                    ShareButton(fileURL: viewModel.currentRecording?.reversedFileURL, createdAt: viewModel.currentRecording?.createdAt)
+                        .padding(.trailing, 20)
+                        .padding(.top, 20)
                 }
 
                 Spacer()
@@ -70,6 +74,7 @@ struct ContentView: View {
         .toast(isShowing: $viewModel.showToast, message: viewModel.toastMessage ?? "")
         .onAppear {
             viewModel.requestMicrophonePermission()
+            AppIconManager.shared.setIcon(isDarkMode: isDarkMode)
         }
     }
 }

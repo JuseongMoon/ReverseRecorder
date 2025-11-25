@@ -13,6 +13,7 @@ struct DarkModeToggle: View {
     var body: some View {
         Button(action: {
             isDarkMode.toggle()
+            AppIconManager.shared.setIcon(isDarkMode: isDarkMode)
         }) {
             ZStack {
                 Circle()

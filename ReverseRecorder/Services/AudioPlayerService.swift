@@ -17,6 +17,7 @@ class AudioPlayerService: NSObject, ObservableObject {
     @Published var duration: TimeInterval = 0
 
     private var timer: Timer?
+    private var loadedURL: URL?
 
     // MARK: - Playback Control
 
@@ -31,6 +32,11 @@ class AudioPlayerService: NSObject, ObservableObject {
 
         duration = audioPlayer?.duration ?? 0
         currentTime = 0
+        loadedURL = url
+    }
+
+    func isLoaded(url: URL) -> Bool {
+        return loadedURL == url && audioPlayer != nil
     }
 
     func play() {

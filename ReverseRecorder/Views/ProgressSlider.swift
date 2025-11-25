@@ -18,8 +18,65 @@ struct ProgressSlider: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            // Time labels
+        VStack(spacing: 0) {
+            // Waveform + Custom slider (위쪽)
+            GeometryReader { geometry in
+                ZStack(alignment: .bottom) {
+                    // Waveform 영역 (항상 30pt 공간 확보)
+                    VStack {
+                        if !viewModel.waveformData.isEmpty {
+                            WaveformView(waveformData: viewModel.waveformData)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(height: 30)
+                    .offset(y: -14)
+
+                    // Slider (하단)
+                    ZStack(alignment: .leading) {
+                        // Background track
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 8)
+
+                        // Progress track
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(width: geometry.size.width * progress, height: 8)
+
+                        // Thumb
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 20, height: 20)
+                            .shadow(radius: 4)
+                            .offset(x: (geometry.size.width - 20) * progress)
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        isDragging = true
+                                        let newProgress = max(0, min(1, value.location.x / geometry.size.width))
+                                        tempValue = newProgress
+                                    }
+                                    .onEnded { value in
+                                        let newProgress = max(0, min(1, value.location.x / geometry.size.width))
+                                        let newTime = newProgress * viewModel.duration
+                                        viewModel.seek(to: newTime)
+                                        isDragging = false
+                                    }
+                            )
+                    }
+                    .frame(height: 20)
+                }
+            }
+            .frame(height: 50)
+
+            // Time labels (아래쪽, 간격 줄임)
             HStack {
                 Text(formatTime(viewModel.currentTime))
                     .font(.caption)
@@ -31,49 +88,6 @@ struct ProgressSlider: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-
-            // Custom slider
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background track
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(height: 8)
-
-                    // Progress track
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * progress, height: 8)
-
-                    // Thumb
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 20, height: 20)
-                        .shadow(radius: 4)
-                        .offset(x: (geometry.size.width - 20) * progress)
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { value in
-                                    isDragging = true
-                                    let newProgress = max(0, min(1, value.location.x / geometry.size.width))
-                                    tempValue = newProgress
-                                }
-                                .onEnded { value in
-                                    let newProgress = max(0, min(1, value.location.x / geometry.size.width))
-                                    let newTime = newProgress * viewModel.duration
-                                    viewModel.seek(to: newTime)
-                                    isDragging = false
-                                }
-                        )
-                }
-            }
-            .frame(height: 20)
         }
         .padding(.horizontal)
     }

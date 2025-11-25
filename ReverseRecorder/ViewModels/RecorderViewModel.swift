@@ -14,6 +14,7 @@ class RecorderViewModel: ObservableObject {
     private let playerService = AudioPlayerService()
     private let reverseService = AudioReverseService.shared
     private let fileService = FileManagerService.shared
+    private let waveformService = AudioWaveformService.shared
 
     // Published Properties
     @Published var isRecording = false
@@ -23,6 +24,7 @@ class RecorderViewModel: ObservableObject {
     @Published var duration: TimeInterval = 0
     @Published var toastMessage: String?
     @Published var showToast = false
+    @Published var waveformData: [Float] = []
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -60,6 +62,13 @@ class RecorderViewModel: ObservableObject {
     }
 
     func startRecording() {
+        // 기존 녹음 파일 삭제
+        if let recording = currentRecording {
+            try? fileService.deleteFile(at: recording.originalFileURL)
+            try? fileService.deleteFile(at: recording.reversedFileURL)
+            currentRecording = nil
+        }
+
         do {
             _ = try recorderService.startRecording()
         } catch {
@@ -97,6 +106,7 @@ class RecorderViewModel: ObservableObject {
                 self.currentRecording = recording
                 self.saveRecording(recording)
                 self.playRecording()
+                self.extractWaveform(from: reversedURL)
 
             case .failure(let error):
                 self.showToastMessage("역재생 변환에 실패했습니다: \(error.localizedDescription)")
@@ -110,7 +120,10 @@ class RecorderViewModel: ObservableObject {
         guard let recording = currentRecording else { return }
 
         do {
-            try playerService.loadAudio(url: recording.reversedFileURL)
+            // 이미 로드된 오디오면 현재 위치에서 재생
+            if !playerService.isLoaded(url: recording.reversedFileURL) {
+                try playerService.loadAudio(url: recording.reversedFileURL)
+            }
             playerService.play()
         } catch {
             showToastMessage("재생에 실패했습니다: \(error.localizedDescription)")
@@ -139,6 +152,7 @@ class RecorderViewModel: ObservableObject {
             try fileService.deleteFile(at: recording.reversedFileURL)
 
             currentRecording = nil
+            waveformData = []
             try fileService.saveRecordings([])
 
             stopPlayback()
@@ -158,6 +172,25 @@ class RecorderViewModel: ObservableObject {
     private func loadLastRecording() {
         let recordings = fileService.loadRecordings()
         currentRecording = recordings.last
+
+        // 저장된 녹음이 있으면 파형도 로드
+        if let recording = currentRecording {
+            extractWaveform(from: recording.reversedFileURL)
+        }
+    }
+
+    // MARK: - Waveform
+
+    private func extractWaveform(from url: URL) {
+        waveformService.extractWaveform(from: url, samplesCount: 100) { [weak self] result in
+            switch result {
+            case .success(let data):
+                self?.waveformData = data
+            case .failure(let error):
+                print("파형 추출 실패: \(error.localizedDescription)")
+                self?.waveformData = []
+            }
+        }
     }
 
     // MARK: - Toast
