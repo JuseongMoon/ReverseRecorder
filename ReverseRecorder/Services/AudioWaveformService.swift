@@ -95,9 +95,9 @@ enum WaveformError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .bufferCreationFailed:
-            return "오디오 버퍼 생성에 실패했습니다."
+            return String(localized: "audio_buffer_creation_failed")
         case .noChannelData:
-            return "오디오 채널 데이터를 찾을 수 없습니다."
+            return String(localized: "audio_channel_data_not_found")
         }
     }
 }

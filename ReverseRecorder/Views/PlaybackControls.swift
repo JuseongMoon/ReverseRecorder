@@ -69,13 +69,13 @@ struct PlaybackControls: View {
             .disabled(viewModel.currentRecording == nil)
         }
         .opacity(viewModel.currentRecording == nil ? 0.3 : 1.0)
-        .alert("녹음 삭제", isPresented: $showDeleteConfirmation) {
-            Button("취소", role: .cancel) { }
-            Button("삭제", role: .destructive) {
+        .alert(String(localized: "delete_recording_title"), isPresented: $showDeleteConfirmation) {
+            Button(String(localized: "cancel"), role: .cancel) { }
+            Button(String(localized: "delete"), role: .destructive) {
                 viewModel.deleteRecording()
             }
         } message: {
-            Text("이 녹음을 삭제하시겠습니까?")
+            Text(String(localized: "delete_recording_message"))
         }
     }
 }

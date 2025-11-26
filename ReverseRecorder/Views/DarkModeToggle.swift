@@ -19,6 +19,7 @@ struct DarkModeToggle: View {
     @Binding var isDarkMode: Bool
     @Binding var isTransitioning: Bool
     var onTransitionStart: ((Bool) -> Void)?
+    var onButtonCenterChanged: ((CGPoint) -> Void)?
 
     var body: some View {
         Button(action: {
@@ -38,24 +39,28 @@ struct DarkModeToggle: View {
                     )
                     .frame(width: 50, height: 50)
                     .shadow(color: isDarkMode ? .purple.opacity(0.5) : .orange.opacity(0.5), radius: 8)
+                    .overlay(
+                        GeometryReader { geometry in
+                            Color.clear
+                                .onAppear {
+                                    let center = CGPoint(
+                                        x: geometry.frame(in: .global).midX,
+                                        y: geometry.frame(in: .global).midY
+                                    )
+                                    onButtonCenterChanged?(center)
+                                }
+                                .onChange(of: geometry.frame(in: .global)) { _, newFrame in
+                                    let center = CGPoint(x: newFrame.midX, y: newFrame.midY)
+                                    onButtonCenterChanged?(center)
+                                }
+                        }
+                    )
 
                 Image(systemName: isDarkMode ? "moon.fill" : "sun.max.fill")
                     .font(.system(size: 24))
                     .foregroundColor(.white)
             }
         }
-        .background(
-            GeometryReader { geometry in
-                Color.clear
-                    .preference(
-                        key: ButtonCenterPreferenceKey.self,
-                        value: CGPoint(
-                            x: geometry.frame(in: .global).midX,
-                            y: geometry.frame(in: .global).midY
-                        )
-                    )
-            }
-        )
         .animation(isTransitioning ? nil : .spring(response: 0.3), value: isDarkMode)
     }
 }

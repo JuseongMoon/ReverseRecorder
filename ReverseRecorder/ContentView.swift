@@ -46,15 +46,21 @@ struct ContentView: View {
         sqrt(pow(to.x - from.x, 2) + pow(to.y - from.y, 2))
     }
 
-    /// 앱 시작 시 다크/라이트 테마 스냅샷 미리 캡처
+    /// 다크/라이트 테마 스냅샷 캡처 (현재 UI 상태 반영)
     private func prepareThemeSnapshots() {
-        // 라이트 테마 스냅샷 (라이트 테마용 토글 버튼 포함)
-        snapshotService.captureLightSnapshot(contentView: snapshotContent(isDark: false))
+        let recording = viewModel.currentRecording
+        let waveform = viewModel.waveformData
+
+        // 라이트 테마 스냅샷 (현재 상태 반영)
+        snapshotService.captureLightSnapshot(
+            contentView: snapshotContent(isDark: false, recording: recording, waveformData: waveform)
+        )
 
         // 약간의 딜레이 후 다크 테마 스냅샷 캡처 (동시 캡처 시 부하 분산)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
-            // 다크 테마 스냅샷 (다크 테마용 토글 버튼 포함)
-            snapshotService.captureDarkSnapshot(contentView: snapshotContent(isDark: true))
+            snapshotService.captureDarkSnapshot(
+                contentView: snapshotContent(isDark: true, recording: recording, waveformData: waveform)
+            )
         }
     }
 
@@ -63,15 +69,15 @@ struct ContentView: View {
         isTransitioning = true
         transitionRadius = 0
 
-        withAnimation(.easeIn(duration: 0.4)) {  // 처음 느리게 → 점점 빨라짐
+        withAnimation(.timingCurve(0.6, 0.05, 0.9, 0.3, duration: 0.4)) {  // 부드러운 시작 → 극적인 가속
             transitionRadius = calculateMaxRadius()
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             isDarkModeOverride = newDarkMode
 
-            // 테마 변경이 먼저 반영된 후 오버레이 제거 (깜빡임 방지)
-            DispatchQueue.main.async {
+            // 테마 변경이 완전히 반영된 후 오버레이 제거 (렌더링 완료 대기)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isTransitioning = false
                 transitionRadius = 0
             }
@@ -99,11 +105,11 @@ struct ContentView: View {
         }
     }
 
-    /// 스냅샷 캡처용 디폴트 콘텐츠 (녹음 파일 없는 상태)
-    /// 실제 컴포넌트를 빈 ViewModel로 재사용하여 레이아웃 일치 보장
+    /// 스냅샷 캡처용 콘텐츠 (현재 UI 상태 반영)
+    /// 녹음이 있으면 파형과 활성화된 버튼 상태를 포함
     @ViewBuilder
-    private func snapshotContent(isDark: Bool) -> some View {
-        let emptyViewModel = RecorderViewModel()  // 빈 ViewModel (녹음 없음)
+    private func snapshotContent(isDark: Bool, recording: AudioRecording?, waveformData: [Float]) -> some View {
+        let hasRecording = recording != nil
 
         ZStack {
             // 배경 - 전체 화면 강제 채우기 (off-screen 렌더링용)
@@ -116,19 +122,19 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
 
-            // 녹음 버튼 (중앙) - 실제 컴포넌트 사용
-            RecordButton(viewModel: emptyViewModel)
+            // 녹음 버튼 (중앙) - 정적 버전
+            snapshotRecordButton()
 
-            // 하단 컨트롤 - 실제 컴포넌트 사용
+            // 하단 컨트롤 - 스냅샷용 정적 컴포넌트
             VStack {
                 Spacer()
 
-                ProgressSlider(viewModel: emptyViewModel)
+                snapshotProgressSlider(waveformData: waveformData)
                     .frame(height: 90)
                     .padding(.horizontal)
                     .padding(.bottom, 20)
 
-                PlaybackControls(viewModel: emptyViewModel)
+                snapshotPlaybackControls(hasRecording: hasRecording)
                     .padding(.bottom, 50)
             }
 
@@ -142,8 +148,8 @@ struct ContentView: View {
 
                     Spacer()
 
-                    // 공유 버튼 - 실제 컴포넌트 사용
-                    ShareButton(fileURL: nil, createdAt: nil)
+                    // 공유 버튼 - 실제 상태 반영
+                    ShareButton(fileURL: recording?.reversedFileURL, createdAt: recording?.createdAt)
                         .padding(.trailing, 20)
                         .padding(.top, 20)
                 }
@@ -151,6 +157,131 @@ struct ContentView: View {
                 Spacer()
             }
         }
+    }
+
+    /// 스냅샷용 정적 RecordButton (원본 RecordButton과 동일한 크기)
+    @ViewBuilder
+    private func snapshotRecordButton() -> some View {
+        ZStack {
+            // Outer circle
+            Circle()
+                .strokeBorder(lineWidth: 8)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 280, height: 280)
+
+            // Inner circle
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 260, height: 260)
+                .shadow(color: .blue.opacity(0.3), radius: 15)
+
+            // Icon
+            Image(systemName: "mic.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.white)
+        }
+    }
+
+    /// 스냅샷용 정적 ProgressSlider (파형 포함)
+    @ViewBuilder
+    private func snapshotProgressSlider(waveformData: [Float]) -> some View {
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                ZStack(alignment: .bottom) {
+                    // Waveform 영역
+                    VStack {
+                        if !waveformData.isEmpty {
+                            WaveformView(waveformData: waveformData)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .frame(height: 30)
+                    .offset(y: -14)
+
+                    // Slider (정적 상태 - 시작 위치)
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 8)
+
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 20, height: 20)
+                            .shadow(radius: 4)
+                            .offset(x: -10)
+                    }
+                    .frame(height: 20)
+                }
+            }
+            .frame(height: 50)
+
+            // Time labels
+            HStack {
+                Text("00:00")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("00:00")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    /// 스냅샷용 정적 PlaybackControls
+    @ViewBuilder
+    private func snapshotPlaybackControls(hasRecording: Bool) -> some View {
+        HStack(spacing: 40) {
+            // Play button
+            Image(systemName: "play.circle.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.blue, .purple],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .blue.opacity(0.3), radius: 5)
+
+            // Stop button
+            Image(systemName: "stop.circle.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.gray, .gray.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .gray.opacity(0.3), radius: 5)
+
+            // Delete button
+            Image(systemName: "trash.circle.fill")
+                .font(.system(size: 50))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.red, .orange],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .red.opacity(0.3), radius: 5)
+        }
+        .opacity(hasRecording ? 1.0 : 0.3)
     }
 
     // 메인 콘텐츠 뷰 (인터랙티브 버전)
@@ -191,6 +322,9 @@ struct ContentView: View {
                         isTransitioning: $isTransitioning,
                         onTransitionStart: { newDarkMode in
                             startTransition(to: newDarkMode)
+                        },
+                        onButtonCenterChanged: { center in
+                            toggleButtonCenter = center
                         }
                     )
                     .padding(.leading, 20)
@@ -210,11 +344,9 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // 전역 좌표를 로컬 좌표로 변환
-            let localButtonCenter = CGPoint(
-                x: toggleButtonCenter.x - geometry.frame(in: .global).minX,
-                y: toggleButtonCenter.y - geometry.frame(in: .global).minY
-            )
+            // 디바이스별 safe area에 비례한 오프셋 계산 (선형 보간)
+            // iPhone 12 (safeArea 47pt) → 8.75, iPhone 16 Pro Max (safeArea 59pt) → 13.75
+            let yOffset = (geometry.safeAreaInsets.top - 47) * 5 / 12 + 8.75
 
             ZStack {
                 // 현재 테마의 메인 콘텐츠
@@ -230,7 +362,7 @@ struct ContentView: View {
                         .mask(
                             Circle()
                                 .frame(width: transitionRadius * 2, height: transitionRadius * 2)
-                                .position(x: toggleButtonCenter.x, y: toggleButtonCenter.y - 9)
+                                .position(x: toggleButtonCenter.x, y: toggleButtonCenter.y - yOffset)
                                 .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
                         )
                         .allowsHitTesting(false)
@@ -238,15 +370,18 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onPreferenceChange(ButtonCenterPreferenceKey.self) { center in
-            toggleButtonCenter = center
-        }
         .preferredColorScheme(isDarkModeOverride == nil ? nil : (isDarkModeOverride! ? .dark : .light))
         .toast(isShowing: $viewModel.showToast, message: viewModel.toastMessage ?? "")
         .onAppear {
             viewModel.requestMicrophonePermission()
 
-            // 스냅샷 미리 캡처 (디폴트 UI 상태)
+            // 스냅샷 업데이트 콜백 먼저 연결 (loadLastRecording에서 파형 추출 시 호출됨)
+            viewModel.onSnapshotUpdateNeeded = { [self] in
+                prepareThemeSnapshots()
+            }
+
+            // 초기 스냅샷 캡처 (저장된 녹음 없는 경우 대비)
+            // 저장된 녹음이 있으면 파형 추출 완료 후 콜백에서 다시 캡처됨
             prepareThemeSnapshots()
         }
     }

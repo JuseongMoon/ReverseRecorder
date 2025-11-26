@@ -12,6 +12,7 @@ struct ShareButton: View {
     let createdAt: Date?
     @State private var showShareSheet = false
     @State private var tempFileURL: URL?
+    @State private var isLoading = false
 
     private var isEnabled: Bool {
         fileURL != nil
@@ -19,9 +20,16 @@ struct ShareButton: View {
 
     var body: some View {
         Button(action: {
-            if isEnabled {
-                tempFileURL = createTempFileForSharing()
-                showShareSheet = true
+            if isEnabled && !isLoading {
+                isLoading = true
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let url = createTempFileForSharing()
+                    DispatchQueue.main.async {
+                        tempFileURL = url
+                        isLoading = false
+                        showShareSheet = true
+                    }
+                }
             }
         }) {
             ZStack {
@@ -40,11 +48,18 @@ struct ShareButton: View {
                     .font(.system(size: 22))
                     .foregroundColor(.white)
                     .offset(y: -1)
+                    .opacity(isLoading ? 0 : 1)
+
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                }
             }
         }
-        .disabled(!isEnabled)
+        .disabled(!isEnabled || isLoading)
         .opacity(isEnabled ? 1.0 : 0.5)
         .animation(.spring(response: 0.3), value: isEnabled)
+        .animation(.easeInOut(duration: 0.2), value: isLoading)
         .sheet(isPresented: $showShareSheet, onDismiss: {
             cleanupTempFile()
         }) {
@@ -57,7 +72,7 @@ struct ShareButton: View {
     private func generateShareFileName(date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HH-mm"
-        return "역재생_\(formatter.string(from: date)).m4a"
+        return "Reversed_\(formatter.string(from: date)).m4a"
     }
 
     private func createTempFileForSharing() -> URL? {

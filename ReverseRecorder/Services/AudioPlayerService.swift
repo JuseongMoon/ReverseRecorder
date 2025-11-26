@@ -59,6 +59,13 @@ class AudioPlayerService: NSObject, ObservableObject {
         stopTimer()
     }
 
+    func unload() {
+        stop()
+        audioPlayer = nil
+        loadedURL = nil
+        duration = 0
+    }
+
     func seek(to time: TimeInterval) {
         audioPlayer?.currentTime = time
         currentTime = time

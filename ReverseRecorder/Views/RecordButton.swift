@@ -7,23 +7,51 @@
 
 import SwiftUI
 
+// 펄스 테두리 컴포넌트
+struct PulsingBorder: View {
+    @State private var isPulsing = false
+
+    var body: some View {
+        Circle()
+            .strokeBorder(lineWidth: 8)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [.red, .orange],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: 280, height: 280)
+            .opacity(isPulsing ? 1.0 : 0.5)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
+                    isPulsing = true
+                }
+            }
+    }
+}
+
 struct RecordButton: View {
     @ObservedObject var viewModel: RecorderViewModel
     @State private var isPressed = false
 
     var body: some View {
         ZStack {
-            // Outer circle
-            Circle()
-                .strokeBorder(lineWidth: 8)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: viewModel.isRecording ? [.red, .orange] : [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            // Outer circle (with pulsing effect when recording)
+            if viewModel.isRecording {
+                PulsingBorder()
+            } else {
+                Circle()
+                    .strokeBorder(lineWidth: 8)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 280, height: 280)
+                    .frame(width: 280, height: 280)
+            }
 
             // Inner circle
             Circle()

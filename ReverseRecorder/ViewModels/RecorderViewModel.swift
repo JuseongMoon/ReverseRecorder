@@ -26,6 +26,21 @@ class RecorderViewModel: ObservableObject {
     @Published var showToast = false
     @Published var waveformData: [Float] = []
 
+    // Recording Progress Properties
+    @Published var recordingTime: TimeInterval = 0
+    @Published var recordingWaveformData: [Float] = []
+    private let maxRecordingDuration: TimeInterval = 60.0
+    private let maxWaveformSamples = 100
+
+    // Reverse Processing Properties
+    @Published var isProcessingReverse = false
+    @Published var reverseProgress: Float = 0
+    @Published var processingWaveformData: [Float] = []
+    private var reverseProgressCancellable: AnyCancellable?
+
+    /// 스냅샷 업데이트가 필요할 때 호출되는 콜백
+    var onSnapshotUpdateNeeded: (() -> Void)?
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -49,6 +64,36 @@ class RecorderViewModel: ObservableObject {
 
         playerService.$duration
             .assign(to: &$duration)
+
+        // Bind recording time
+        recorderService.$recordingTime
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$recordingTime)
+
+        // Bind audio level to waveform data
+        recorderService.$audioLevel
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in
+                guard let self = self, self.isRecording else { return }
+                self.appendToRecordingWaveform(level: level)
+            }
+            .store(in: &cancellables)
+    }
+
+    // MARK: - Recording Waveform
+
+    private func appendToRecordingWaveform(level: Float) {
+        // 1분(60초) 이후에는 더 이상 파형 추가하지 않음
+        guard recordingTime <= maxRecordingDuration else { return }
+
+        // 60초 동안 100개 샘플이 균등하게 채워지도록 (0.6초마다 1개)
+        let samplesPerSecond = Double(maxWaveformSamples) / maxRecordingDuration
+        let expectedSamples = Int(recordingTime * samplesPerSecond)
+
+        // 현재 샘플 수가 목표보다 적으면 추가
+        if recordingWaveformData.count < expectedSamples && recordingWaveformData.count < maxWaveformSamples {
+            recordingWaveformData.append(level)
+        }
     }
 
     // MARK: - Recording
@@ -56,7 +101,7 @@ class RecorderViewModel: ObservableObject {
     func requestMicrophonePermission() {
         recorderService.requestPermission { [weak self] granted in
             if !granted {
-                self?.showToastMessage("마이크 권한이 필요합니다.")
+                self?.showToastMessage(String(localized: "microphone_permission_required"))
             }
         }
     }
@@ -69,31 +114,56 @@ class RecorderViewModel: ObservableObject {
             currentRecording = nil
         }
 
+        // 녹음 시작 시 파형 데이터 초기화
+        recordingWaveformData = []
+        recordingTime = 0
+        waveformData = []
+
         do {
             _ = try recorderService.startRecording()
         } catch {
-            showToastMessage("녹음 시작에 실패했습니다: \(error.localizedDescription)")
+            showToastMessage(String(format: String(localized: "recording_start_failed"), error.localizedDescription))
         }
     }
 
     func stopRecording() {
         guard let result = recorderService.stopRecording() else {
-            showToastMessage("녹음 저장에 실패했습니다.")
+            showToastMessage(String(localized: "recording_save_failed"))
             return
         }
 
         let originalURL = result.url
         let duration = result.duration
 
-        // Wait 1 second, then reverse and play
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.reverseAndPlay(originalURL: originalURL, duration: duration)
-        }
+        // 즉시 역재생 처리 시작
+        reverseAndPlay(originalURL: originalURL, duration: duration)
     }
 
     private func reverseAndPlay(originalURL: URL, duration: TimeInterval) {
-        reverseService.reverseAudio(sourceURL: originalURL) { [weak self] result in
+        // 처리 시작 상태 설정
+        isProcessingReverse = true
+        reverseProgress = 0
+        processingWaveformData = []
+
+        // 진행률 구독
+        reverseProgressCancellable = reverseService.progressPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] progress in
+                guard let self = self else { return }
+
+                self.reverseProgress = progress.progress
+                // 파형 데이터 순차 추가
+                self.processingWaveformData.append(progress.waveformSample)
+            }
+
+        // 진행률 포함 역재생 처리 시작
+        reverseService.reverseAudioWithProgress(sourceURL: originalURL) { [weak self] result in
             guard let self = self else { return }
+
+            // 구독 해제
+            self.reverseProgressCancellable?.cancel()
+            self.reverseProgressCancellable = nil
+            self.isProcessingReverse = false
 
             switch result {
             case .success(let reversedURL):
@@ -105,13 +175,32 @@ class RecorderViewModel: ObservableObject {
 
                 self.currentRecording = recording
                 self.saveRecording(recording)
+
+                // 처리 중 파형을 정규화하여 최종 파형으로 전환
+                self.waveformData = self.normalizeWaveform(self.processingWaveformData)
+                self.processingWaveformData = []
+
                 self.playRecording()
-                self.extractWaveform(from: reversedURL)
+
+                // 스냅샷 업데이트 요청
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.onSnapshotUpdateNeeded?()
+                }
 
             case .failure(let error):
-                self.showToastMessage("역재생 변환에 실패했습니다: \(error.localizedDescription)")
+                self.processingWaveformData = []
+                self.showToastMessage(String(format: String(localized: "reverse_failed"), error.localizedDescription))
             }
         }
+    }
+
+    // MARK: - Waveform Normalization
+
+    private func normalizeWaveform(_ samples: [Float]) -> [Float] {
+        guard let maxValue = samples.max(), maxValue > 0 else {
+            return samples
+        }
+        return samples.map { $0 / maxValue }
     }
 
     // MARK: - Playback
@@ -126,7 +215,7 @@ class RecorderViewModel: ObservableObject {
             }
             playerService.play()
         } catch {
-            showToastMessage("재생에 실패했습니다: \(error.localizedDescription)")
+            showToastMessage(String(format: String(localized: "playback_failed"), error.localizedDescription))
         }
     }
 
@@ -155,9 +244,14 @@ class RecorderViewModel: ObservableObject {
             waveformData = []
             try fileService.saveRecordings([])
 
-            stopPlayback()
+            playerService.unload()
+
+            // 삭제 완료 후 스냅샷 업데이트 요청
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.onSnapshotUpdateNeeded?()
+            }
         } catch {
-            showToastMessage("삭제에 실패했습니다: \(error.localizedDescription)")
+            showToastMessage(String(format: String(localized: "delete_failed"), error.localizedDescription))
         }
     }
 
@@ -165,7 +259,7 @@ class RecorderViewModel: ObservableObject {
         do {
             try fileService.saveRecordings([recording])
         } catch {
-            showToastMessage("저장에 실패했습니다: \(error.localizedDescription)")
+            showToastMessage(String(format: String(localized: "save_failed"), error.localizedDescription))
         }
     }
 
@@ -186,6 +280,10 @@ class RecorderViewModel: ObservableObject {
             switch result {
             case .success(let data):
                 self?.waveformData = data
+                // 파형 추출 완료 후 스냅샷 업데이트 요청
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self?.onSnapshotUpdateNeeded?()
+                }
             case .failure(let error):
                 print("파형 추출 실패: \(error.localizedDescription)")
                 self?.waveformData = []

@@ -12,8 +12,11 @@ import Foundation
 class AudioRecorderService: NSObject, ObservableObject {
     private var audioRecorder: AVAudioRecorder?
     private var recordingURL: URL?
+    private var meteringTimer: Timer?
 
     @Published var isRecording = false
+    @Published var recordingTime: TimeInterval = 0
+    @Published var audioLevel: Float = 0
 
     // MARK: - Permission
 
@@ -44,15 +47,42 @@ class AudioRecorderService: NSObject, ObservableObject {
 
         audioRecorder = try AVAudioRecorder(url: fileURL, settings: settings)
         audioRecorder?.delegate = self
+        audioRecorder?.isMeteringEnabled = true
         audioRecorder?.record()
 
         isRecording = true
+        recordingTime = 0
+        audioLevel = 0
+        startMeteringTimer()
+
         return fileURL
+    }
+
+    // MARK: - Metering
+
+    private func startMeteringTimer() {
+        meteringTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            guard let self = self, let recorder = self.audioRecorder, self.isRecording else { return }
+
+            recorder.updateMeters()
+            self.recordingTime = recorder.currentTime
+
+            // 평균 파워를 0~1 범위로 정규화 (-50dB ~ 0dB 범위 사용)
+            let averagePower = recorder.averagePower(forChannel: 0)
+            let normalizedLevel = max(0, min(1, (averagePower + 50) / 50))
+            self.audioLevel = normalizedLevel
+        }
+    }
+
+    private func stopMeteringTimer() {
+        meteringTimer?.invalidate()
+        meteringTimer = nil
     }
 
     func stopRecording() -> (url: URL, duration: TimeInterval)? {
         guard let recorder = audioRecorder, isRecording else { return nil }
 
+        stopMeteringTimer()
         recorder.stop()
         isRecording = false
 
