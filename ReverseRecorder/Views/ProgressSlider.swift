@@ -9,12 +9,15 @@ import SwiftUI
 
 struct ProgressSlider: View {
     @ObservedObject var viewModel: RecorderViewModel
+    var isStatic: Bool = false
+    var staticWaveformData: [Float]? = nil
     @State private var isDragging = false
     @State private var tempValue: Double = 0
 
     private let maxRecordingDuration: TimeInterval = 60.0
 
     private var progress: Double {
+        if isStatic { return 0 }
         if viewModel.isRecording {
             // 녹음 중: 60초 기준, 1분 초과 시 1.0 고정
             return min(1.0, viewModel.recordingTime / maxRecordingDuration)
@@ -29,6 +32,7 @@ struct ProgressSlider: View {
     }
 
     private var progressTrackColors: [Color] {
+        if isStatic { return [.blue, .purple] }
         if viewModel.isRecording {
             return [.red, .orange]
         } else if viewModel.isProcessingReverse {
@@ -39,11 +43,24 @@ struct ProgressSlider: View {
     }
 
     private var thumbProgress: Double {
+        if isStatic { return 0 }
         // 프로세싱 중에는 플레이헤드 위치 0 고정
         if viewModel.isProcessingReverse {
             return 0
         }
         return progress
+    }
+
+    private var waveformData: [Float] {
+        staticWaveformData ?? viewModel.waveformData
+    }
+
+    private var isRecording: Bool {
+        isStatic ? false : viewModel.isRecording
+    }
+
+    private var isProcessingReverse: Bool {
+        isStatic ? false : viewModel.isProcessingReverse
     }
 
     var body: some View {
@@ -53,17 +70,17 @@ struct ProgressSlider: View {
                 ZStack(alignment: .bottom) {
                     // Waveform 영역 (항상 30pt 공간 확보)
                     VStack {
-                        if viewModel.isRecording {
+                        if isRecording {
                             // 녹음 중: 실시간 파형 (고정 barWidth로 자연스럽게 확장)
                             RecordingWaveformView(waveformData: viewModel.recordingWaveformData)
                                 .frame(width: geometry.size.width)
-                        } else if viewModel.isProcessingReverse {
+                        } else if isProcessingReverse {
                             // 역재생 처리 중: 순차적으로 나타나는 회색 파형
                             ProcessingWaveformView(waveformData: viewModel.processingWaveformData)
                                 .frame(width: geometry.size.width)
-                        } else if !viewModel.waveformData.isEmpty {
+                        } else if !waveformData.isEmpty {
                             // 재생 중: 정적 파형
-                            WaveformView(waveformData: viewModel.waveformData)
+                            WaveformView(waveformData: waveformData)
                                 .frame(width: geometry.size.width)
                         }
                         Spacer(minLength: 0)
@@ -95,18 +112,18 @@ struct ProgressSlider: View {
                             .frame(width: 20, height: 20)
                             .shadow(radius: 4)
                             .offset(x: geometry.size.width * thumbProgress - 10)
-                            .opacity(viewModel.isProcessingReverse ? 0 : 1)
+                            .opacity(isProcessingReverse ? 0 : 1)
                             .gesture(
                                 DragGesture(minimumDistance: 0)
                                     .onChanged { value in
-                                        // 녹음 중 또는 처리 중에는 드래그 불가
-                                        guard !viewModel.isRecording && !viewModel.isProcessingReverse else { return }
+                                        // 정적 모드, 녹음 중 또는 처리 중에는 드래그 불가
+                                        guard !isStatic && !viewModel.isRecording && !viewModel.isProcessingReverse else { return }
                                         isDragging = true
                                         let newProgress = max(0, min(1, value.location.x / geometry.size.width))
                                         tempValue = newProgress
                                     }
                                     .onEnded { value in
-                                        guard !viewModel.isRecording && !viewModel.isProcessingReverse else { return }
+                                        guard !isStatic && !viewModel.isRecording && !viewModel.isProcessingReverse else { return }
                                         let newProgress = max(0, min(1, value.location.x / geometry.size.width))
                                         let newTime = newProgress * viewModel.duration
                                         viewModel.seek(to: newTime)
@@ -122,14 +139,14 @@ struct ProgressSlider: View {
             // Time labels (아래쪽, 간격 줄임)
             HStack {
                 // 왼쪽: 녹음 중에는 00:00 고정, 재생 중에는 현재 시간
-                Text(formatTime(viewModel.isRecording ? 0 : viewModel.currentTime))
+                Text(formatTime(isStatic ? 0 : (isRecording ? 0 : viewModel.currentTime)))
                     .font(.caption)
                     .foregroundColor(.secondary)
 
                 Spacer()
 
                 // 오른쪽: 녹음 중에는 녹음 시간, 재생 중에는 전체 길이
-                Text(formatTime(viewModel.isRecording ? viewModel.recordingTime : viewModel.duration))
+                Text(formatTime(isStatic ? 0 : (isRecording ? viewModel.recordingTime : viewModel.duration)))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -33,12 +33,17 @@ struct PulsingBorder: View {
 
 struct RecordButton: View {
     @ObservedObject var viewModel: RecorderViewModel
+    var isStatic: Bool = false
     @State private var isPressed = false
+
+    private var isRecording: Bool {
+        isStatic ? false : viewModel.isRecording
+    }
 
     var body: some View {
         ZStack {
             // Outer circle (with pulsing effect when recording)
-            if viewModel.isRecording {
+            if isRecording {
                 PulsingBorder()
             } else {
                 Circle()
@@ -57,23 +62,24 @@ struct RecordButton: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: viewModel.isRecording ? [.red, .orange] : [.blue.opacity(0.3), .purple.opacity(0.3)],
+                        colors: isRecording ? [.red, .orange] : [.blue.opacity(0.3), .purple.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
                 .frame(width: 260, height: 260)
-                .shadow(color: viewModel.isRecording ? .red.opacity(0.5) : .blue.opacity(0.3), radius: viewModel.isRecording ? 30 : 15)
+                .shadow(color: isRecording ? .red.opacity(0.5) : .blue.opacity(0.3), radius: isRecording ? 30 : 15)
 
             // Icon
-            Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
+            Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                 .font(.system(size: 80))
                 .foregroundColor(.white)
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: viewModel.isRecording)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isRecording)
         .onTapGesture {
+            guard !isStatic else { return }
             isPressed = true
 
             if viewModel.isRecording {

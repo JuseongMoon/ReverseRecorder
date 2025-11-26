@@ -9,19 +9,30 @@ import SwiftUI
 
 struct PlaybackControls: View {
     @ObservedObject var viewModel: RecorderViewModel
+    var isStatic: Bool = false
+    var staticHasRecording: Bool? = nil
     @State private var showDeleteConfirmation = false
+
+    private var hasRecording: Bool {
+        staticHasRecording ?? (viewModel.currentRecording != nil)
+    }
+
+    private var isPlaying: Bool {
+        isStatic ? false : viewModel.isPlaying
+    }
 
     var body: some View {
         HStack(spacing: 40) {
             // Play/Pause button
             Button(action: {
+                guard !isStatic else { return }
                 if viewModel.isPlaying {
                     viewModel.pausePlayback()
                 } else {
                     viewModel.playRecording()
                 }
             }) {
-                Image(systemName: viewModel.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 50))
                     .foregroundStyle(
                         LinearGradient(
@@ -32,10 +43,11 @@ struct PlaybackControls: View {
                     )
                     .shadow(color: .blue.opacity(0.3), radius: 5)
             }
-            .disabled(viewModel.currentRecording == nil)
+            .disabled(!hasRecording || isStatic)
 
             // Stop button
             Button(action: {
+                guard !isStatic else { return }
                 viewModel.stopPlayback()
             }) {
                 Image(systemName: "stop.circle.fill")
@@ -49,10 +61,11 @@ struct PlaybackControls: View {
                     )
                     .shadow(color: .gray.opacity(0.3), radius: 5)
             }
-            .disabled(viewModel.currentRecording == nil)
+            .disabled(!hasRecording || isStatic)
 
             // Delete button
             Button(action: {
+                guard !isStatic else { return }
                 showDeleteConfirmation = true
             }) {
                 Image(systemName: "trash.circle.fill")
@@ -66,9 +79,9 @@ struct PlaybackControls: View {
                     )
                     .shadow(color: .red.opacity(0.3), radius: 5)
             }
-            .disabled(viewModel.currentRecording == nil)
+            .disabled(!hasRecording || isStatic)
         }
-        .opacity(viewModel.currentRecording == nil ? 0.3 : 1.0)
+        .opacity(hasRecording ? 1.0 : 0.3)
         .alert(String(localized: "delete_recording_title"), isPresented: $showDeleteConfirmation) {
             Button(String(localized: "cancel"), role: .cancel) { }
             Button(String(localized: "delete"), role: .destructive) {

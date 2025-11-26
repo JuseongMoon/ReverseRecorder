@@ -84,29 +84,7 @@ struct ContentView: View {
         }
     }
 
-    // 정적 토글 버튼 (트랜지션 오버레이용, 콜백 없음)
-    @ViewBuilder
-    private func staticToggleButton(isDark: Bool) -> some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: isDark ? [.purple, .indigo] : [.yellow, .orange],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 50, height: 50)
-                .shadow(color: isDark ? .purple.opacity(0.5) : .orange.opacity(0.5), radius: 8)
-
-            Image(systemName: isDark ? "moon.fill" : "sun.max.fill")
-                .font(.system(size: 24))
-                .foregroundColor(.white)
-        }
-    }
-
-    /// 스냅샷 캡처용 콘텐츠 (현재 UI 상태 반영)
-    /// 녹음이 있으면 파형과 활성화된 버튼 상태를 포함
+    /// 스냅샷 캡처용 콘텐츠 (실제 컴포넌트 재사용, 정적 모드)
     @ViewBuilder
     private func snapshotContent(isDark: Bool, recording: AudioRecording?, waveformData: [Float]) -> some View {
         let hasRecording = recording != nil
@@ -122,29 +100,36 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
 
-            // 녹음 버튼 (중앙) - 정적 버전
-            snapshotRecordButton()
+            // 녹음 버튼 (중앙) - 정적 모드
+            RecordButton(viewModel: viewModel, isStatic: true)
 
-            // 하단 컨트롤 - 스냅샷용 정적 컴포넌트
+            // 하단 컨트롤 - 정적 모드
             VStack {
                 Spacer()
 
-                snapshotProgressSlider(waveformData: waveformData)
+                ProgressSlider(viewModel: viewModel, isStatic: true, staticWaveformData: waveformData)
                     .frame(height: 90)
                     .padding(.horizontal)
                     .padding(.bottom, 20)
 
-                snapshotPlaybackControls(hasRecording: hasRecording)
+                PlaybackControls(viewModel: viewModel, isStatic: true, staticHasRecording: hasRecording)
                     .padding(.bottom, 50)
             }
 
             // 상단 컨트롤
             VStack {
                 HStack {
-                    // 다크모드 토글 (정적 버튼 - 테마별 색상 필요)
-                    staticToggleButton(isDark: isDark)
-                        .padding(.leading, 20)
-                        .padding(.top, 20)
+                    // 다크모드 토글 (정적 모드)
+                    DarkModeToggle(
+                        isDarkMode: isDarkModeBinding,
+                        isTransitioning: .constant(false),
+                        onTransitionStart: nil,
+                        onButtonCenterChanged: nil,
+                        isStatic: true,
+                        staticIsDark: isDark
+                    )
+                    .padding(.leading, 20)
+                    .padding(.top, 20)
 
                     Spacer()
 
@@ -157,131 +142,6 @@ struct ContentView: View {
                 Spacer()
             }
         }
-    }
-
-    /// 스냅샷용 정적 RecordButton (원본 RecordButton과 동일한 크기)
-    @ViewBuilder
-    private func snapshotRecordButton() -> some View {
-        ZStack {
-            // Outer circle
-            Circle()
-                .strokeBorder(lineWidth: 8)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 280, height: 280)
-
-            // Inner circle
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 260, height: 260)
-                .shadow(color: .blue.opacity(0.3), radius: 15)
-
-            // Icon
-            Image(systemName: "mic.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.white)
-        }
-    }
-
-    /// 스냅샷용 정적 ProgressSlider (파형 포함)
-    @ViewBuilder
-    private func snapshotProgressSlider(waveformData: [Float]) -> some View {
-        VStack(spacing: 0) {
-            GeometryReader { geometry in
-                ZStack(alignment: .bottom) {
-                    // Waveform 영역
-                    VStack {
-                        if !waveformData.isEmpty {
-                            WaveformView(waveformData: waveformData)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(height: 30)
-                    .offset(y: -14)
-
-                    // Slider (정적 상태 - 시작 위치)
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 8)
-
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 20, height: 20)
-                            .shadow(radius: 4)
-                            .offset(x: -10)
-                    }
-                    .frame(height: 20)
-                }
-            }
-            .frame(height: 50)
-
-            // Time labels
-            HStack {
-                Text("00:00")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("00:00")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    /// 스냅샷용 정적 PlaybackControls
-    @ViewBuilder
-    private func snapshotPlaybackControls(hasRecording: Bool) -> some View {
-        HStack(spacing: 40) {
-            // Play button
-            Image(systemName: "play.circle.fill")
-                .font(.system(size: 50))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.blue, .purple],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: .blue.opacity(0.3), radius: 5)
-
-            // Stop button
-            Image(systemName: "stop.circle.fill")
-                .font(.system(size: 50))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.gray, .gray.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: .gray.opacity(0.3), radius: 5)
-
-            // Delete button
-            Image(systemName: "trash.circle.fill")
-                .font(.system(size: 50))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [.red, .orange],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: .red.opacity(0.3), radius: 5)
-        }
-        .opacity(hasRecording ? 1.0 : 0.3)
     }
 
     // 메인 콘텐츠 뷰 (인터랙티브 버전)
@@ -327,6 +187,8 @@ struct ContentView: View {
                             toggleButtonCenter = center
                         }
                     )
+                    .disabled(viewModel.isRecording)
+                    .opacity(viewModel.isRecording ? 0.5 : 1.0)
                     .padding(.leading, 20)
                     .padding(.top, 20)
 
