@@ -138,15 +138,15 @@ struct ProgressSlider: View {
 
             // Time labels (아래쪽, 간격 줄임)
             HStack {
-                // 왼쪽: 녹음 중에는 00:00 고정, 재생 중에는 현재 시간
+                // 왼쪽: 정적/녹음 중에는 00:00 고정, 재생 중에는 현재 시간
                 Text(formatTime(isStatic ? 0 : (isRecording ? 0 : viewModel.currentTime)))
                     .font(.caption)
                     .foregroundColor(.secondary)
 
                 Spacer()
 
-                // 오른쪽: 녹음 중에는 녹음 시간, 재생 중에는 전체 길이
-                Text(formatTime(isStatic ? 0 : (isRecording ? viewModel.recordingTime : viewModel.duration)))
+                // 오른쪽: 녹음 중에는 녹음 시간, 정적/재생 중에는 전체 길이
+                Text(formatTime(isRecording ? viewModel.recordingTime : viewModel.duration))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
