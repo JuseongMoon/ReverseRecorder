@@ -19,6 +19,9 @@ struct ContentView: View {
     @State private var transitionTargetDarkMode: Bool = false
     @State private var toggleButtonCenter: CGPoint = .zero
 
+    // 화면 방향 변경 시 스냅샷 재생성을 위한 Task
+    @State private var snapshotUpdateTask: Task<Void, Never>?
+
     private var isDarkMode: Bool {
         isDarkModeOverride ?? (systemColorScheme == .dark)
     }
@@ -64,6 +67,27 @@ struct ContentView: View {
         }
     }
 
+    /// 화면 크기 변경 시 스냅샷 재생성 (방향 전환 대응)
+    private func handleScreenSizeChange(from oldSize: CGSize, to newSize: CGSize) {
+        // 크기가 실제로 변경되었는지 확인 (1pt 이상 차이)
+        guard abs(oldSize.width - newSize.width) > 1 ||
+              abs(oldSize.height - newSize.height) > 1 else { return }
+
+        // 트랜지션 중이면 무시
+        guard !isTransitioning else { return }
+
+        // Debounced 스냅샷 재생성 (300ms 대기 - 방향 전환 애니메이션 완료 후)
+        snapshotUpdateTask?.cancel()
+        snapshotUpdateTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                prepareThemeSnapshots()
+            }
+        }
+    }
+
     private func startTransition(to newDarkMode: Bool) {
         transitionTargetDarkMode = newDarkMode
         isTransitioning = true
@@ -88,6 +112,8 @@ struct ContentView: View {
     @ViewBuilder
     private func snapshotContent(isDark: Bool, recording: AudioRecording?, waveformData: [Float]) -> some View {
         let hasRecording = recording != nil
+        let screenBounds = UIScreen.main.bounds
+        let isLandscape = screenBounds.width > screenBounds.height
 
         ZStack {
             // 배경 - 전체 화면 강제 채우기 (off-screen 렌더링용)
@@ -110,10 +136,10 @@ struct ContentView: View {
                 ProgressSlider(viewModel: viewModel, isStatic: true, staticWaveformData: waveformData)
                     .frame(height: 90)
                     .padding(.horizontal)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, isLandscape ? 10 : 20)
 
                 PlaybackControls(viewModel: viewModel, isStatic: true, staticHasRecording: hasRecording)
-                    .padding(.bottom, 50)
+                    .padding(.bottom, isLandscape ? 20 : 50)
             }
 
             // 상단 컨트롤
@@ -146,7 +172,7 @@ struct ContentView: View {
 
     // 메인 콘텐츠 뷰 (인터랙티브 버전)
     @ViewBuilder
-    private func mainContent() -> some View {
+    private func mainContent(isLandscape: Bool) -> some View {
         ZStack {
             // Background gradient
             LinearGradient(
@@ -167,11 +193,11 @@ struct ContentView: View {
                 ProgressSlider(viewModel: viewModel)
                     .frame(height: 90)
                     .padding(.horizontal)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, isLandscape ? 10 : 20)
 
                 // Playback controls
                 PlaybackControls(viewModel: viewModel)
-                    .padding(.bottom, 50)
+                    .padding(.bottom, isLandscape ? 20 : 50)
             }
 
             // Top controls (dark mode toggle & share button)
@@ -209,10 +235,11 @@ struct ContentView: View {
             // 디바이스별 safe area에 비례한 오프셋 계산 (선형 보간)
             // iPhone 12 (safeArea 47pt) → 8.75, iPhone 16 Pro Max (safeArea 59pt) → 13.75
             let yOffset = (geometry.safeAreaInsets.top - 47) * 5 / 12 + 8.75
+            let isLandscape = geometry.size.width > geometry.size.height
 
             ZStack {
                 // 현재 테마의 메인 콘텐츠
-                mainContent()
+                mainContent(isLandscape: isLandscape)
 
                 // 트랜지션 오버레이 (스냅샷 이미지 기반)
                 if isTransitioning, let snapshot = snapshotService.snapshot(for: transitionTargetDarkMode) {
@@ -231,6 +258,9 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: geometry.size) { oldSize, newSize in
+                handleScreenSizeChange(from: oldSize, to: newSize)
+            }
         }
         .preferredColorScheme(isDarkModeOverride == nil ? nil : (isDarkModeOverride! ? .dark : .light))
         .toast(isShowing: $viewModel.showToast, message: viewModel.toastMessage ?? "")

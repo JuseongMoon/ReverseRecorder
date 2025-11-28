@@ -19,7 +19,16 @@ class ThemeSnapshotService: ObservableObject {
     @Published var darkSnapshot: UIImage?
     @Published var isReady: Bool = false
 
+    // 현재 스냅샷의 화면 크기 저장 (방향 변경 감지용)
+    private var lastSnapshotSize: CGSize = .zero
+
     private init() {}
+
+    /// 현재 화면 크기와 스냅샷 크기가 일치하는지 확인
+    func needsSnapshotUpdate() -> Bool {
+        let currentSize = UIScreen.main.bounds.size
+        return lastSnapshotSize != currentSize
+    }
 
     /// 앱 시작 시 호출 - 두 테마의 스냅샷 미리 캡처 (같은 뷰 사용)
     @MainActor
@@ -85,11 +94,14 @@ class ThemeSnapshotService: ObservableObject {
         hostingController.view.layoutIfNeeded()
 
         // 다음 런루프에서 스냅샷 캡처 (레이아웃 완료 보장)
-        DispatchQueue.main.async {
-            let renderer = UIGraphicsImageRenderer(bounds: UIScreen.main.bounds)
+        DispatchQueue.main.async { [weak self] in
+            let bounds = UIScreen.main.bounds
+            let renderer = UIGraphicsImageRenderer(bounds: bounds)
             let image = renderer.image { _ in
-                hostingController.view.drawHierarchy(in: UIScreen.main.bounds, afterScreenUpdates: true)
+                hostingController.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
             }
+            // 캡처 완료 시 화면 크기 저장
+            self?.lastSnapshotSize = bounds.size
             completion(image)
         }
     }
