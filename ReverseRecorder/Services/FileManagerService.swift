@@ -17,7 +17,10 @@ class FileManagerService {
     // MARK: - Directory URLs
 
     var documentsDirectory: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        guard let url = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            fatalError("Documents directory not available")
+        }
+        return url
     }
 
     var recordingsDirectory: URL {

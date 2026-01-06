@@ -41,21 +41,27 @@ class AudioPlayerService: NSObject, ObservableObject {
 
     func play() {
         audioPlayer?.play()
-        isPlaying = true
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = true
+        }
         startTimer()
     }
 
     func pause() {
         audioPlayer?.pause()
-        isPlaying = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = false
+        }
         stopTimer()
     }
 
     func stop() {
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
-        isPlaying = false
-        currentTime = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = false
+            self?.currentTime = 0
+        }
         stopTimer()
     }
 
@@ -98,14 +104,18 @@ class AudioPlayerService: NSObject, ObservableObject {
 
 extension AudioPlayerService: AVAudioPlayerDelegate {
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        isPlaying = false
-        currentTime = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = false
+            self?.currentTime = 0
+        }
         player.currentTime = 0
         stopTimer()
     }
 
     func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
-        isPlaying = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isPlaying = false
+        }
         stopTimer()
     }
 }

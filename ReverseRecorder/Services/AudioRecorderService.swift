@@ -50,9 +50,11 @@ class AudioRecorderService: NSObject, ObservableObject {
         audioRecorder?.isMeteringEnabled = true
         audioRecorder?.record()
 
-        isRecording = true
-        recordingTime = 0
-        audioLevel = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecording = true
+            self?.recordingTime = 0
+            self?.audioLevel = 0
+        }
         startMeteringTimer()
 
         return fileURL
@@ -89,7 +91,9 @@ class AudioRecorderService: NSObject, ObservableObject {
 
         stopMeteringTimer()
         recorder.stop()
-        isRecording = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecording = false
+        }
 
         // 오디오 세션 비활성화 (다른 앱의 오디오 재생 복원)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -106,11 +110,15 @@ class AudioRecorderService: NSObject, ObservableObject {
 extension AudioRecorderService: AVAudioRecorderDelegate {
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if !flag {
-            isRecording = false
+            DispatchQueue.main.async { [weak self] in
+                self?.isRecording = false
+            }
         }
     }
 
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
-        isRecording = false
+        DispatchQueue.main.async { [weak self] in
+            self?.isRecording = false
+        }
     }
 }
