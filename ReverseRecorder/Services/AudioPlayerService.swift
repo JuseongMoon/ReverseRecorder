@@ -64,6 +64,9 @@ class AudioPlayerService: NSObject, ObservableObject {
         audioPlayer = nil
         loadedURL = nil
         duration = 0
+
+        // 오디오 세션 비활성화 (다른 앱의 오디오 재생 복원)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     func seek(to time: TimeInterval) {
@@ -76,7 +79,12 @@ class AudioPlayerService: NSObject, ObservableObject {
     private func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.01, repeats: true) { [weak self] _ in
             guard let self = self, let player = self.audioPlayer else { return }
-            self.currentTime = player.currentTime
+            let time = player.currentTime
+
+            // @Published 프로퍼티는 메인 스레드에서 업데이트
+            DispatchQueue.main.async { [weak self] in
+                self?.currentTime = time
+            }
         }
     }
 

@@ -65,12 +65,17 @@ class AudioRecorderService: NSObject, ObservableObject {
             guard let self = self, let recorder = self.audioRecorder, self.isRecording else { return }
 
             recorder.updateMeters()
-            self.recordingTime = recorder.currentTime
+            let currentRecordingTime = recorder.currentTime
 
             // 평균 파워를 0~1 범위로 정규화 (-50dB ~ 0dB 범위 사용)
             let averagePower = recorder.averagePower(forChannel: 0)
             let normalizedLevel = max(0, min(1, (averagePower + 50) / 50))
-            self.audioLevel = normalizedLevel
+
+            // @Published 프로퍼티는 메인 스레드에서 업데이트
+            DispatchQueue.main.async { [weak self] in
+                self?.recordingTime = currentRecordingTime
+                self?.audioLevel = normalizedLevel
+            }
         }
     }
 
@@ -85,6 +90,9 @@ class AudioRecorderService: NSObject, ObservableObject {
         stopMeteringTimer()
         recorder.stop()
         isRecording = false
+
+        // 오디오 세션 비활성화 (다른 앱의 오디오 재생 복원)
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
 
         let duration = recorder.currentTime
         guard let url = recordingURL else { return nil }

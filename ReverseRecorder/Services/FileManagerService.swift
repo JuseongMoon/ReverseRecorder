@@ -62,11 +62,18 @@ class FileManagerService {
     }
 
     func loadRecordings() -> [AudioRecording] {
-        guard fileExists(at: recordingsFileURL),
-              let data = try? Data(contentsOf: recordingsFileURL),
-              let recordings = try? JSONDecoder().decode([AudioRecording].self, from: data) else {
+        guard fileExists(at: recordingsFileURL) else {
             return []
         }
-        return recordings
+
+        do {
+            let data = try Data(contentsOf: recordingsFileURL)
+            let recordings = try JSONDecoder().decode([AudioRecording].self, from: data)
+            return recordings
+        } catch {
+            // 데이터 로드 또는 디코딩 실패 시 로깅
+            print("녹음 데이터 로드 실패: \(error.localizedDescription)")
+            return []
+        }
     }
 }

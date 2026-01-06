@@ -19,10 +19,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct ReverseRecorderApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var viewModel = RecorderViewModel()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(viewModel: viewModel)
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .background {
+                // 백그라운드 진입 시 녹음 중이면 정지
+                if viewModel.isRecording {
+                    viewModel.stopRecording()
+                }
+                // 재생 중이면 일시정지
+                if viewModel.isPlaying {
+                    viewModel.pausePlayback()
+                }
+            }
         }
     }
 }

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = RecorderViewModel()
+    @ObservedObject var viewModel: RecorderViewModel
     @StateObject private var snapshotService = ThemeSnapshotService.shared
     @AppStorage("isDarkModeOverride") private var isDarkModeOverride: Bool?
     @Environment(\.colorScheme) private var systemColorScheme
@@ -60,9 +60,9 @@ struct ContentView: View {
         )
 
         // 약간의 딜레이 후 다크 테마 스냅샷 캡처 (동시 캡처 시 부하 분산)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             snapshotService.captureDarkSnapshot(
-                contentView: snapshotContent(isDark: true, recording: recording, waveformData: waveform)
+                contentView: self.snapshotContent(isDark: true, recording: recording, waveformData: waveform)
             )
         }
     }
@@ -268,8 +268,8 @@ struct ContentView: View {
             viewModel.requestMicrophonePermission()
 
             // 스냅샷 업데이트 콜백 먼저 연결 (loadLastRecording에서 파형 추출 시 호출됨)
-            viewModel.onSnapshotUpdateNeeded = { [self] in
-                prepareThemeSnapshots()
+            viewModel.onSnapshotUpdateNeeded = {
+                self.prepareThemeSnapshots()
             }
 
             // 초기 스냅샷 캡처 (저장된 녹음 없는 경우 대비)
@@ -280,5 +280,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(viewModel: RecorderViewModel())
 }

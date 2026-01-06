@@ -109,8 +109,13 @@ class RecorderViewModel: ObservableObject {
     func startRecording() {
         // 기존 녹음 파일 삭제
         if let recording = currentRecording {
-            try? fileService.deleteFile(at: recording.originalFileURL)
-            try? fileService.deleteFile(at: recording.reversedFileURL)
+            do {
+                try fileService.deleteFile(at: recording.originalFileURL)
+                try fileService.deleteFile(at: recording.reversedFileURL)
+            } catch {
+                // 파일 삭제 실패해도 녹음은 계속 진행하지만 로깅
+                print("이전 녹음 파일 삭제 실패: \(error.localizedDescription)")
+            }
             currentRecording = nil
         }
 
@@ -183,8 +188,8 @@ class RecorderViewModel: ObservableObject {
                 self.playRecording()
 
                 // 스냅샷 업데이트 요청
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.onSnapshotUpdateNeeded?()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.onSnapshotUpdateNeeded?()
                 }
 
             case .failure(let error):

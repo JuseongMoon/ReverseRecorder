@@ -166,11 +166,14 @@ class AudioReverseService {
             // 청크 데이터 복사 및 역순 처리
             for channel in 0..<channelCount {
                 let sourcePtr = floatChannelData[channel]
-                let destPtr = chunkBuffer.floatChannelData![channel]
+                guard let destPtr = chunkBuffer.floatChannelData?[channel] else { continue }
 
                 for i in 0..<chunkFrameCount {
                     // 청크 내에서도 역순으로 복사
-                    destPtr[i] = sourcePtr[startFrame + chunkFrameCount - 1 - i]
+                    let sourceIndex = startFrame + chunkFrameCount - 1 - i
+                    // 경계 검사로 크래시 방지
+                    guard sourceIndex >= 0, sourceIndex < frameLength else { continue }
+                    destPtr[i] = sourcePtr[sourceIndex]
                 }
             }
 
@@ -181,7 +184,8 @@ class AudioReverseService {
             let waveformSample = extractWaveformFromChunk(
                 floatChannelData: floatChannelData[0],
                 startFrame: startFrame,
-                frameCount: chunkFrameCount
+                frameCount: chunkFrameCount,
+                totalFrameLength: frameLength
             )
 
             // 진행률 발행
@@ -203,11 +207,15 @@ class AudioReverseService {
     private func extractWaveformFromChunk(
         floatChannelData: UnsafeMutablePointer<Float>,
         startFrame: Int,
-        frameCount: Int
+        frameCount: Int,
+        totalFrameLength: Int
     ) -> Float {
         var maxAbs: Float = 0
         for i in 0..<frameCount {
-            let absValue = abs(floatChannelData[startFrame + i])
+            let index = startFrame + i
+            // 경계 검사로 크래시 방지
+            guard index >= 0, index < totalFrameLength else { continue }
+            let absValue = abs(floatChannelData[index])
             if absValue > maxAbs {
                 maxAbs = absValue
             }
