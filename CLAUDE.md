@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ReverseRecorder는 SwiftUI 기반의 iOS 애플리케이션으로, 사용자가 음성을 녹음하고 자동으로 역재생하여 들을 수 있는 간단한 앱입니다.
 
 ### 주요 기능
-- **Press & Hold 녹음**: 버튼을 누르고 있는 동안 녹음, 떼면 자동 종료
-- **실시간 녹음 파형**: 녹음 중 오디오 레벨을 실시간으로 파형으로 시각화
+- **탭 토글 녹음**: 버튼을 탭하면 녹음 시작, 다시 탭하면 녹음 종료 (최대 60초)
+- **실시간 녹음 파형**: 녹음 중 오디오 레벨을 실시간으로 파형으로 시각화 (펄스 효과 포함)
 - **역재생 진행률 표시**: 역재생 변환 중 진행률과 파형 애니메이션 표시
 - **자동 역재생**: 녹음 종료 후 오디오를 역재생 변환하여 자동 재생
 - **재생 컨트롤**: 재생/정지/삭제 버튼
@@ -52,7 +52,7 @@ ReverseRecorder/
 ├── ViewModels/
 │   └── RecorderViewModel.swift       # 상태 관리 및 비즈니스 로직 (ObservableObject)
 ├── Views/
-│   ├── RecordButton.swift            # Press & Hold 녹음 버튼
+│   ├── RecordButton.swift            # 탭 토글 녹음 버튼 (펄스 효과 포함)
 │   ├── ProgressSlider.swift          # 드래그 가능한 프로그레스 슬라이더 (파형 포함)
 │   ├── PlaybackControls.swift        # 재생/정지/삭제 컨트롤
 │   ├── WaveformView.swift            # 재생용 파형 시각화 뷰
@@ -70,7 +70,6 @@ ReverseRecorder/
 │   └── ThemeSnapshotService.swift    # 테마 전환 스냅샷 서비스
 ├── ContentView.swift                 # 메인 뷰 (모든 컴포넌트 통합)
 ├── ReverseRecorderApp.swift          # 앱 진입점 (@main)
-├── Info.plist                        # 마이크 권한 설정
 └── Assets.xcassets/                  # 이미지 및 색상 에셋
 ```
 
@@ -82,6 +81,10 @@ ReverseRecorder/
   - Services 레이어와 통신
   - Combine을 사용한 reactive binding
   - 스냅샷 업데이트 콜백 (`onSnapshotUpdateNeeded`)
+  - 녹음 상태: `isRecording`, `recordingTime`, `recordingWaveformData`
+  - 처리 상태: `isProcessingReverse`, `reverseProgress`, `processingWaveformData`
+  - 재생 상태: `isPlaying`, `currentTime`, `duration`, `waveformData`
+  - 파형 샘플 수: 100개 고정 (`maxWaveformSamples`)
 
 ### Services 레이어
 각 Service는 단일 책임 원칙(SRP)에 따라 특정 기능만 담당합니다:
@@ -92,6 +95,7 @@ ReverseRecorder/
    - 녹음 파일 생성
    - 실시간 오디오 레벨 미터링 (`@Published audioLevel`)
    - 녹음 시간 추적 (`@Published recordingTime`)
+   - 최대 녹음 시간: 60초 (ViewModel에서 제한)
 
 2. **AudioReverseService** (싱글톤):
    - AVAudioFile로 오디오 샘플 읽기
@@ -102,8 +106,9 @@ ReverseRecorder/
 
 3. **AudioPlayerService**:
    - AVAudioPlayer를 사용한 재생
-   - Timer 기반 실시간 프로그레스 업데이트
-   - Seek, Play, Pause, Stop 기능
+   - Timer 기반 실시간 프로그레스 업데이트 (10ms 간격)
+   - Seek, Play, Pause, Stop, Unload 기능
+   - `isLoaded(url:)` 메서드로 현재 로드된 오디오 확인
 
 4. **AudioWaveformService** (싱글톤):
    - 오디오 파일에서 파형 데이터 추출
@@ -159,8 +164,13 @@ let normalizedLevel = max(0, min(1, (averagePower + 50) / 50))
 - `@State`: 로컬 뷰 상태 (트랜지션 관련)
 
 #### Gesture Handling
-- **Press & Hold 녹음**: `DragGesture(minimumDistance: 0)`를 사용하여 onChanged/onEnded로 press/release 감지
-- **프로그레스 드래그**: GeometryReader와 DragGesture를 조합하여 커스텀 슬라이더 구현
+- **탭 토글 녹음**: `onTapGesture`를 사용하여 녹음 시작/종료 토글
+- **프로그레스 드래그**: GeometryReader와 `DragGesture(minimumDistance: 0)`를 조합하여 커스텀 슬라이더 구현
+
+#### Static Mode (스냅샷 캡처용)
+- Views에 `isStatic` 파라미터를 추가하여 스냅샷 캡처 시 인터랙션 비활성화
+- `RecordButton`, `ProgressSlider`, `PlaybackControls`, `DarkModeToggle` 등에서 지원
+- 정적 모드에서는 애니메이션과 사용자 입력이 무시됨
 
 #### Custom Modifiers
 - `ToastModifier`: View extension으로 토스트 메시지 기능 제공
@@ -176,20 +186,26 @@ let normalizedLevel = max(0, min(1, (averagePower + 50) / 50))
 - `PassthroughSubject`로 역재생 진행률 발행
 - `assign(to:)` 및 `sink`로 상태 바인딩
 
-### 권한 처리
-Info.plist에 마이크 권한 설정 필수:
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>녹음 기능을 사용하기 위해 마이크 권한이 필요합니다.</string>
-```
+### 권한 처리 및 프로젝트 설정
+Xcode 프로젝트 설정에 포함된 주요 설정:
+- **마이크 권한**: `NSMicrophoneUsageDescription` - "녹음 기능을 사용하기 위해 마이크 권한이 필요합니다."
+- **iOS 최소 버전**: iOS 18.6
+- **화면 방향**:
+  - iPhone: 세로 방향만 지원 (`UIInterfaceOrientationPortrait`)
+  - iPad: 모든 방향 지원
+- **앱 표시 이름**: "Reverse Recorder"
 
 ### UI/UX 디자인
 - **모던 스타일**: 그라데이션, 그림자 효과
 - **SF Symbols**: 시스템 아이콘 사용
 - **애니메이션**: spring animation, scale effect, timing curve
+- **펄스 효과**: 녹음 중 `PulsingBorder` 컴포넌트로 테두리 펄스 애니메이션
 - **반응형**: GeometryReader를 사용한 동적 레이아웃
 - **원형 트랜지션**: 다크모드 전환 시 circular reveal 효과
 - **파형 시각화**: 녹음/처리/재생 각 상태별 다른 색상의 파형
+  - 녹음 중: 빨강/주황 그라데이션
+  - 처리 중: 회색
+  - 재생 중: 파랑/보라 그라데이션
 
 ### 파일 저장 위치
 - 원본 녹음: `Documents/Recordings/original_<timestamp>.m4a`
