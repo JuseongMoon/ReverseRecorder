@@ -1,0 +1,15 @@
+# Xcode 사용자별 상태 — 기기 식별자와 로컬 경로가 들어간다
+xcuserdata/
+*.xcuserstate
+
+# 빌드 산출물
+build/
+DerivedData/
+*.xcarchive
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
