@@ -3,9 +3,18 @@
 목소리를 녹음하면 **거꾸로 재생해주는** iOS 앱입니다.
 녹음을 멈추는 순간 자동으로 역재생 변환이 시작되고, 파형과 함께 재생됩니다.
 
-- 플랫폼: iOS (SwiftUI)
+- 플랫폼: iOS 18.6+ (SwiftUI)
 - 최대 녹음 길이: 60초
-- 외부 의존성 없음 — AVFoundation만 사용
+- 오디오 처리는 AVFoundation만 사용 — 외부 오디오 라이브러리 없음
+- 사용 지표 수집용으로 Firebase Analytics만 붙어 있습니다
+
+<p>
+  <img src="docs/screenshots/01-ready.jpg" width="30%" alt="녹음 대기 화면">
+  <img src="docs/screenshots/02-recording.jpg" width="30%" alt="녹음 중 — 실시간 파형">
+  <img src="docs/screenshots/03-theme.jpg" width="30%" alt="라이트 / 다크 테마">
+</p>
+
+왼쪽부터 녹음 대기, 녹음 중 실시간 파형, 라이트/다크 테마.
 
 ## 기술적으로 다룬 것
 
@@ -60,6 +69,11 @@ ReverseRecorder/
 ## 기술 스택
 
 SwiftUI · AVFoundation(AVAudioFile, AVAudioPCMBuffer, AVAudioRecorder, AVAudioPlayer)
+Firebase Analytics (SPM, `firebase-ios-sdk`) — `ReverseRecorderApp.swift`의 `AppDelegate`에서 `FirebaseApp.configure()`만 호출합니다.
+
+`ReverseRecorder/GoogleService-Info.plist`는 저장소에 포함되어 있습니다.
+이 파일은 앱을 Firebase 프로젝트에 연결하는 **클라이언트 식별자**일 뿐 비밀값이 아니며,
+실제 접근 통제는 서버 쪽 Firebase 보안 규칙이 담당합니다.
 
 ## 실행 방법
 

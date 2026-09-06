@@ -25,19 +25,16 @@ ReverseRecorder는 SwiftUI 기반의 iOS 애플리케이션으로, 사용자가 
 open ReverseRecorder.xcodeproj
 
 # 커맨드 라인에서 빌드 (iOS 시뮬레이터용)
-xcodebuild -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 15' build
-
-# 커맨드 라인에서 실행
-xcodebuild -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 15' run
+xcodebuild -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
 
 ### 테스트 실행
-```bash
-# 모든 테스트 실행
-xcodebuild test -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 15'
+이 프로젝트에는 아직 테스트 타깃이 없습니다. `xcodebuild test`는 실패합니다.
+테스트 타깃을 추가한 뒤에 아래 명령을 사용하세요.
 
-# 특정 테스트만 실행
-xcodebuild test -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 15' -only-testing:ReverseRecorderTests/TestClassName/testMethodName
+```bash
+# 테스트 타깃 추가 후 사용
+# xcodebuild test -project ReverseRecorder.xcodeproj -scheme ReverseRecorder -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
 ## Code Architecture
@@ -220,3 +217,27 @@ Xcode 프로젝트 설정에 포함된 주요 설정:
 ### 지역화 (Localization)
 - `String(localized:)` 사용하여 문자열 지역화 지원
 - 에러 메시지 및 권한 요청 메시지 지역화
+
+## 공개 저장소 규칙
+
+이 저장소는 공개되어 있다. 커밋한 것은 되돌려도 남는다.
+
+- **시크릿 금지** — API 키·토큰·서명 키(`*.jks`/`*.p12`)·서비스 계정 키·실제 사용자 데이터를 커밋하지 않는다.
+  값은 **`Secrets.xcconfig`** 에만 두고 저장소에는 `*.example`만 올린다.
+  소스·plist·manifest·주석·커밋 메시지 어디에도 값을 쓰지 않는다.
+  이미 올렸다면 되돌리는 것으로 끝내지 말고 **키를 폐기·재발급**한다.
+- **내부 정보 금지** — 로컬 절대경로(`/Users/…`), 저장소 밖 파일 참조, 관리자 URL,
+  인프라 식별자(버킷·배포 ID·계정 번호), 개인 기기 식별자(UDID·시리얼),
+  릴리스 진행 상태와 스토어 콘솔 절차는 문서에 남기지 않는다.
+- **내부 문서 위치** — 가격 전략·미출시 기획·운영 절차·서버 계약은 저장소에 두지 않는다.
+  로컬에 두고 gitignore 하되 **그 판단 근거를 이 문서에 적어** 다음 세션이 되돌리지 않게 한다.
+  gitignore된 경로를 코드 주석이나 문서에서 참조하지 않는다 — 방문자에게는 끊어진 링크다.
+- **문서 정확성** — 여기 적힌 버전·경로·명령·구조가 코드와 다르면 코드가 아니라 문서를 고친다.
+  배포 타깃과 언어 버전은 프로젝트 기본값이 아니라 **앱 타깃의 실제 값**을 확인해 적는다.
+- **브랜치** — 에이전트 작업 브랜치는 머지 후 지운다. 원격에 실험 브랜치를 남기지 않는다.
+  **처음 push 하는 순간 그 브랜치의 문서·메모도 함께 공개된다.**
+- **`main`에 force-push 하지 않는다.** 공개된 히스토리를 다시 쓰면 클론·포크한 쪽이 깨진다.
+  (예외: 시크릿 제거 — 이때도 키 폐기가 먼저다.)
+- **push 전 확인** — `git fetch origin && git status -sb`로 원격이 앞섰는지 보고, 앞섰으면 덮지 말고 rebase 한다.
+  `git log origin/main..HEAD --stat`으로 올라갈 파일 전체를 확인해 무관한 파일을 분리하고,
+  `git diff`에서 키·절대경로·기기 식별자가 없는지 본다. **`git add .` 금지.**
